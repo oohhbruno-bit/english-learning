@@ -1,0 +1,23 @@
+# Root
+node_modules/
+dist/
+build/
+*.log
+.env
+.env.local
+.env.*.local
+.DS_Store
+*.swp
+*.swo
+*~
+
+# IDE
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# OS
+Thumbs.db
+ehthumbs.db
+Desktop.ini

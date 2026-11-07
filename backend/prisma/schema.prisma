@@ -1,0 +1,176 @@
+// Prisma Schema for English Learning App (SQLite compatible)
+// Run: npx prisma migrate dev --name init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Enums stored as Strings for SQLite compatibility
+// CEFRLevel: A1, A2, B1, B2, C1, C2
+// LessonStatus: NOT_STARTED, IN_PROGRESS, COMPLETED, MASTERED
+// ExerciseType: MULTIPLE_CHOICE, FILL_BLANK, TRANSLATION, LISTENING, SPEAKING, MATCHING, ORDERING
+// AchievementCategory: STREAK, XP, LESSONS, PERFECT, SPEED, SPECIAL
+// AchievementRarity: COMMON, RARE, EPIC, LEGENDARY
+
+model User {
+  id                String    @id @default(cuid())
+  email             String    @unique
+  passwordHash      String
+  name              String
+  avatar            String?
+  level             String    @default("A1")      // CEFRLevel
+  xp                Int       @default(0)
+  streak            Int       @default(0)
+  longestStreak     Int       @default(0)
+  lastActiveDate    DateTime  @default(now())
+  dailyGoalXP       Int       @default(50)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  progress          UserProgress[]
+  achievements      UserAchievement[]
+  dailyGoals        DailyGoal[]
+  sessions          Session[]
+
+  @@index([email])
+  @@index([level])
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+}
+
+model Course {
+  id              String     @id @default(cuid())
+  level           String     // CEFRLevel
+  title           String
+  description     String
+  order           Int
+  totalLessons    Int        @default(0)
+  estimatedHours  Float      @default(0)
+  thumbnail       String?
+  isPublished     Boolean    @default(true)
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  lessons         Lesson[]
+  progress        UserProgress[]
+
+  @@unique([level])
+  @@index([order])
+}
+
+model Lesson {
+  id           String       @id @default(cuid())
+  courseId     String
+  title        String
+  description  String
+  order        Int
+  xpReward     Int          @default(25)
+  content      String       // JSON string: vocabulary, grammar, exercises, dialogue
+  isPublished  Boolean      @default(true)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  course       Course       @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  progress     UserProgress[]
+
+  @@unique([courseId, order])
+  @@index([courseId])
+  @@index([order])
+}
+
+model UserProgress {
+  id                String        @id @default(cuid())
+  userId            String
+  lessonId          String
+  courseId          String
+  status            String        @default("NOT_STARTED") // LessonStatus
+  score             Int           @default(0)
+  completedExercises String        @default("[]")       // JSON string array
+  timeSpent         Int           @default(0) // seconds
+  lastAttemptAt     DateTime      @default(now())
+  completedAt       DateTime?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  user              User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lesson            Lesson        @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  course            Course        @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, lessonId])
+  @@index([userId, courseId])
+  @@index([userId, status])
+}
+
+model Achievement {
+  id           String             @id @default(cuid())
+  key          String             @unique
+  name         String
+  description  String
+  icon         String
+  category     String             // AchievementCategory
+  requirement  String             // JSON string: { type: string, value: number }
+  xpReward     Int                @default(0)
+  rarity       String             @default("COMMON") // AchievementRarity
+  createdAt    DateTime           @default(now())
+
+  userAchievements UserAchievement[]
+}
+
+model UserAchievement {
+  id            String       @id @default(cuid())
+  userId        String
+  achievementId String
+  unlockedAt    DateTime     @default(now())
+
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievement   Achievement  @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, achievementId])
+  @@index([userId])
+}
+
+model DailyGoal {
+  id            String   @id @default(cuid())
+  userId        String
+  date          DateTime // Stored as DateTime (date only)
+  targetXP      Int
+  earnedXP      Int      @default(0)
+  isCompleted   Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([userId])
+}
+
+model LeaderboardSnapshot {
+  id        String   @id @default(cuid())
+  period    String   // daily, weekly, monthly, all
+  date      DateTime // Stored as DateTime (date only)
+  userId    String
+  rank      Int
+  xp        Int
+  streak    Int
+  createdAt DateTime @default(now())
+
+  @@unique([period, date, userId])
+  @@index([period, date, rank])
+}
